@@ -3,17 +3,18 @@
 from gimpfu import *
 
 def collapseLayers(img, tdrawable):
-
-    # copy to new image
-
-    # flatten layer groups
-    order = 0
-    for layer in img.layers:
-        if(pdb.gimp_item_is_group(layer)):
-            order = extractGroup(img, layer, order)
-        order += 1
-    # move to top left
-    # run combine/fuse
+    pdb.gimp_image_freeze_layers(img)
+    disabled = pdb.gimp_image_undo_disable(img)
+    try:
+        order = 0
+        for layer in img.layers:
+            if(pdb.gimp_item_is_group(layer)):
+                order = extractGroup(img, layer, order)
+            order += 1
+    finally:
+        pdb.gimp_image_thaw_layers(img)
+        if disabled:
+            pdb.gimp_image_undo_enable(img)
 
 def extractGroup(img, group, order):
     for layer in group.children:
