@@ -17,8 +17,10 @@ def sprites(img, tdrawable):
         pdb.gimp_message("all images {}".format(",".join([i.name for i in imgs])))
 
         if len(img.layers) > 0:
-            # others already did this with paste
-            pdb.plug_in_autocrop(img, img.layers[0])
+            # I don't think this is needed actually
+            # due to layer size finding and resizing done in tileAndFlatten
+            # pdb.plug_in_autocrop(img, img.layers[0])
+            pass
         else:
             imgs.pop(0)
             pdb.gimp_message("staring img now emtpy")
@@ -32,7 +34,7 @@ def sprites(img, tdrawable):
             # fuse images # pdb.script_fu_fuse_layers(image, drawable, str(cols))
             # write this myself?
             # export fused images
-            pdb.gimp_display_new(i) # TODO remove
+            pdb.gimp_display_new(i) # TODO remove after export
     except Exception, e:
         pdb.gimp_message("an exception occured: {}".format(e))
         for i in imgs:
@@ -41,13 +43,11 @@ def sprites(img, tdrawable):
         pdb.gimp_message("an exception occured")
         for i in imgs:
             pdb.gimp_image_delete(i)
-    finally:
-        if disabled:
-            pdb.gimp_image_undo_enable(img)
 
 def tileAndFlatten(img):
     disabled = pdb.gimp_image_undo_disable(img)
     w,h = 0,0
+    padd=10
     cols, rows = findFactor(len(img.layers))
     # pdb.gimp_message("selected {},{} for {} items".format(cols, rows, len(img.layers)))
 
@@ -56,13 +56,17 @@ def tileAndFlatten(img):
             w = l.width
         if l.height > h:
             h = l.height
-    
-    pdb.gimp_image_resize(img, w*cols, h*rows, 0, 0)
-    for i, l in enumerate(img.layers):
+    imgW = w*cols + padd * (cols-1)
+    imgH = h*rows + padd * (rows-1)
+    pdb.gimp_image_resize(img, imgW, imgH, 0, 0)
+    # reversing makes the numbers match up with sort orders
+    for i, l in enumerate(reversed(img.layers)):
         col = i % cols
-        row = math.floor(i / rows)
+        row = math.floor(i / cols)
         # pdb.gimp_message("moving {} to {},{}".format(l.name, col, row))
-        pdb.gimp_layer_set_offsets(l, w*col, h*row)
+        x = (w + padd)*col
+        y = (h + padd)*row
+        pdb.gimp_layer_set_offsets(l, x, y)
     layer = pdb.gimp_image_merge_visible_layers(img, 0) # 0 is for "expand"
     if disabled:
         pdb.gimp_image_undo_enable(img)
@@ -77,11 +81,7 @@ def processGroup(img, group):
         img.remove_layer(group)
         return []
     elif "[Flat]" in group.name:
-        # TODO merge these down using flatten group thing in file next door
-        return []
-        # merge down?
-    elif "[Keep]" in group.name:
-        # don't touch these, they'll get hit with exploder
+        flattenGroup(img, group)
         return []
     pdb.gimp_message("recurse into {}".format(group.name))
     imgs = []
@@ -91,20 +91,38 @@ def processGroup(img, group):
         else:
             processLayer(img, layer)
     
-    # for some reason groups can't be cut but they can be copied
-    copy = pdb.gimp_edit_copy(group)
-    img.remove_layer(group)
-    if copy:
-        newImg = pdb.gimp_edit_paste_as_new_image()
-        # pdb.gimp_display_new(newImg)
-        imgs.append(newImg)
+    if not ("[Keep]" in group.name):
+        # for some reason groups can't be cut but they can be copied
+        copy = pdb.gimp_edit_copy(group)
+        img.remove_layer(group)
+        if copy:
+            newImg = pdb.gimp_edit_paste_as_new_image()
+            # pdb.gimp_display_new(newImg)
+            imgs.append(newImg)
     return imgs
+
+def flattenGroup(img, group):
+    # make a new layer and flatten the group onto that
+    p = group.parent
+    children =[]
+    if not p:
+        children = img.layers
+    else:
+        children = p.children
+    i = children.index(group)
+    newLayer = gimp.Layer(img, group.name+"-merged", img.width, img.height, RGB_IMAGE, 100, NORMAL_MODE)
+    pdb.gimp_image_insert_layer(img, newLayer, p, i+1)
+    newLayer = pdb.gimp_image_merge_down(img, group, 0)
+    processLayer(img, newLayer)
+
 
 def processLayer(img, layer):
     if not layer.visible:
         img.remove_layer(layer)
         return
     pdb.gimp_layer_set_offsets(layer, 0, 0)
+    # auto crop works on the active layer
+    pdb.gimp_image_set_active_layer(img, layer)
     pdb.plug_in_autocrop_layer(img, layer)
 
 register(
