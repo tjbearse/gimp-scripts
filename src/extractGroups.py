@@ -3,15 +3,14 @@
 from gimpfu import *
 
 def splitGroups(img, tdrawable):
-    width = img.width
-    height = img.height
-
-    order = 0
+    new = []
     for layer in img.layers:
         if(pdb.gimp_item_is_group(layer)):
             pdb.gimp_edit_copy(layer)
             newImg = pdb.gimp_edit_paste_as_new_image()
             pdb.gimp_display_new(newImg)
+            new.append(new)
+    return new
 
 register(
         "python_fu_extract_groups",
@@ -23,7 +22,7 @@ register(
         "<Image>/Filters/TJ/_Extract Groups",
         "RGB*, GRAY*",
         [],
-        [],
+        ["list(images)", "new images", "images that were created"], # (type, name, description)
         splitGroups)
 
 main()

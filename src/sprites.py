@@ -110,7 +110,7 @@ def flattenGroup(img, group):
     else:
         children = p.children
     i = children.index(group)
-    newLayer = gimp.Layer(img, group.name+"-merged", img.width, img.height, RGB_IMAGE, 100, NORMAL_MODE)
+    newLayer = gimp.Layer(img, group.name+"-merged", img.width, img.height, RGBA_IMAGE, 100, NORMAL_MODE)
     pdb.gimp_image_insert_layer(img, newLayer, p, i+1)
     newLayer = pdb.gimp_image_merge_down(img, group, 0)
     processLayer(img, newLayer)
